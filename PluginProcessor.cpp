@@ -66,7 +66,7 @@ void VoiceCleanerProcessor::prepareToPlay (double sr, int samplesPerBlock)
     }
 
     mixSmoothed.reset (sr, 0.05);
-    mixSmoothed.setCurrentAndSetTargetValue (0.0f);
+    mixSmoothed.setCurrentAndTargetValue (0.0f);
 
     setLatencySamples (latency);   // le logiciel compense automatiquement ce retard
 }

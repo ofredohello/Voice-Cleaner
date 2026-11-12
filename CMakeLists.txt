@@ -48,10 +48,10 @@ juce_add_plugin(VoiceCleaner
     COPY_PLUGIN_AFTER_BUILD FALSE)
 
 target_sources(VoiceCleaner PRIVATE
-    Source/PluginProcessor.cpp
-    Source/PluginProcessor.h
-    Source/FeedbackDetector.h
-    Source/Denoiser.h)
+    PluginProcessor.cpp
+    PluginProcessor.h
+    FeedbackDetector.h
+    Denoiser.h)
 
 target_compile_features(VoiceCleaner PRIVATE cxx_std_17)
 

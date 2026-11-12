@@ -1,0 +1,49 @@
+name: Compiler le plugin Windows
+
+# Se lance tout seul a chaque envoi de fichiers, ou a la main (onglet Actions > Run workflow)
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Recuperer les fichiers
+        uses: actions/checkout@v4
+
+      # Prepare les outils de compilation Visual Studio
+      - name: Preparer l'environnement
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # clang-cl est necessaire car RNNoise est ecrit en C avec des fonctions que le compilateur
+      # classique de Microsoft ne gere pas.
+      - name: Configurer
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=clang-cl
+          -DCMAKE_CXX_COMPILER=clang-cl
+
+      - name: Compiler
+        run: cmake --build build --config Release --parallel
+
+      - name: Rassembler les fichiers a telecharger
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination dist -Recurse
+          }
+          Get-ChildItem -Path build -Recurse -File -Filter "*.exe" |
+            Where-Object { $_.FullName -match "Standalone" } |
+            ForEach-Object { Copy-Item -Path $_.FullName -Destination dist }
+          Get-ChildItem -Path dist -Recurse | Select-Object -First 50 FullName
+          if (-not (Get-ChildItem -Path dist -Filter "*.vst3")) { throw "Aucun plugin .vst3 trouve" }
+
+      - name: Publier le resultat
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voice-Cleaner-Windows
+          path: dist
+          if-no-files-found: error

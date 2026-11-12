@@ -1,49 +1,42 @@
-name: Compiler le plugin Windows
+name: Compiler le plugin Mac
 
-# Se lance tout seul a chaque envoi de fichiers, ou a la main (onglet Actions > Run workflow)
+# Se lance tout seul a chaque modification, ou a la main (onglet Actions > Run workflow)
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-2022
+  build-mac:
+    runs-on: macos-14
     steps:
       - name: Recuperer les fichiers
         uses: actions/checkout@v4
 
-      # Prepare les outils de compilation Visual Studio
-      - name: Preparer l'environnement
-        uses: ilammy/msvc-dev-cmd@v1
-
-      # clang-cl est necessaire car RNNoise est ecrit en C avec des fonctions que le compilateur
-      # classique de Microsoft ne gere pas.
+      # Plugin "universel" : fonctionne sur Mac Apple Silicon (M1/M2/M3/M4) et Mac Intel
       - name: Configurer
         run: >
-          cmake -S . -B build -G Ninja
+          cmake -S . -B build
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_C_COMPILER=clang-cl
-          -DCMAKE_CXX_COMPILER=clang-cl
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
 
       - name: Compiler
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 4
 
       - name: Rassembler les fichiers a telecharger
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist | Out-Null
-          Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" | ForEach-Object {
-            Copy-Item -Path $_.FullName -Destination dist -Recurse
-          }
-          Get-ChildItem -Path build -Recurse -File -Filter "*.exe" |
-            Where-Object { $_.FullName -match "Standalone" } |
-            ForEach-Object { Copy-Item -Path $_.FullName -Destination dist }
-          Get-ChildItem -Path dist -Recurse | Select-Object -First 50 FullName
-          if (-not (Get-ChildItem -Path dist -Filter "*.vst3")) { throw "Aucun plugin .vst3 trouve" }
+          mkdir dist
+          find build -type d -name "*.vst3" -prune -exec cp -R {} dist/ \;
+          find build -type d -name "*.component" -prune -exec cp -R {} dist/ \;
+          find build -type d -name "*.app" -prune -exec cp -R {} dist/ \;
+          ls -la dist
+          if ! ls dist | grep -q "vst3"; then echo "Aucun plugin .vst3 trouve"; exit 1; fi
+          for b in dist/*; do codesign --force --deep -s - "$b"; done
+          ditto -c -k --keepParent dist Voice-Cleaner-Mac.zip
 
       - name: Publier le resultat
         uses: actions/upload-artifact@v4
         with:
-          name: Voice-Cleaner-Windows
-          path: dist
+          name: Voice-Cleaner-Mac
+          path: Voice-Cleaner-Mac.zip
           if-no-files-found: error

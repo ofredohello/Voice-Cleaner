@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-mac:
-    runs-on: runs-on: macos-15-intel
+    runs-on: macos-15-intel
     steps:
       - name: Recuperer les fichiers
         uses: actions/checkout@v4

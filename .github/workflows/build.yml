@@ -1,4 +1,4 @@
-name: Compiler le plugin Mac
+name: Compiler le plugin (Mac et Windows)
 
 # Se lance tout seul a chaque modification, ou a la main (onglet Actions > Run workflow)
 on:
@@ -12,7 +12,6 @@ jobs:
       - name: Recuperer les fichiers
         uses: actions/checkout@v4
 
-      # Plugin "universel" : fonctionne sur Mac Apple Silicon (M1/M2/M3/M4) et Mac Intel
       - name: Configurer
         run: >
           cmake -S . -B build
@@ -39,4 +38,42 @@ jobs:
         with:
           name: Voice-Cleaner-Mac
           path: Voice-Cleaner-Mac.zip
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Recuperer les fichiers
+        uses: actions/checkout@v4
+
+      - name: Preparer l'environnement
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configurer
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=clang-cl
+          -DCMAKE_CXX_COMPILER=clang-cl
+
+      - name: Compiler
+        run: cmake --build build --config Release --parallel
+
+      - name: Rassembler les fichiers a telecharger
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist | Out-Null
+          Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" | ForEach-Object {
+            Copy-Item -Path $_.FullName -Destination dist -Recurse
+          }
+          Get-ChildItem -Path build -Recurse -File -Filter "*.exe" |
+            Where-Object { $_.FullName -match "Standalone" } |
+            ForEach-Object { Copy-Item -Path $_.FullName -Destination dist }
+          if (-not (Get-ChildItem -Path dist -Filter "*.vst3")) { throw "Aucun plugin .vst3 trouve" }
+
+      - name: Publier le resultat
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voice-Cleaner-Windows
+          path: dist
           if-no-files-found: error
